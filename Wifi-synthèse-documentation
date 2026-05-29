@@ -1,0 +1,388 @@
+# Projet Wi-Fi — Normes, sécurité et analyse de trames
+
+## 1. Présentation du projet
+
+Ce projet a pour objectif d’étudier le fonctionnement des réseaux Wi-Fi à travers une approche à la fois théorique et pratique.
+Il porte sur les normes Wi-Fi, les bandes de fréquence, les canaux, l’architecture réseau, les mécanismes de sécurité, ainsi que l’analyse de captures réseau au format `.pcap` et `.pcapng`.
+
+L’objectif principal est de comprendre comment un client Wi-Fi découvre un réseau, s’y authentifie, s’y associe, négocie ses clés de chiffrement, puis échange ou termine une communication avec un point d’accès.
+
+Ce travail s’inscrit dans une démarche cybersécurité orientée analyse réseau, supervision et investigation.
+
+## 2. Objectifs pédagogiques
+
+Les objectifs du projet sont les suivants :
+
+* Comprendre les principales normes Wi-Fi : 802.11a/b/g/n/ac/ax/be.
+* Identifier les bandes de fréquence utilisées par le Wi-Fi : 2,4 GHz, 5 GHz et 6 GHz.
+* Comprendre le rôle des canaux Wi-Fi et leur impact sur les performances.
+* Étudier l’architecture d’un réseau Wi-Fi : client, point d’accès, SSID, BSSID, mode infrastructure.
+* Comprendre les mécanismes de sécurité : WEP, WPA, WPA2, WPA3, SAE, EAPOL, PMF.
+* Utiliser Wireshark et tshark pour analyser des captures réseau.
+* Identifier les trames Wi-Fi importantes : Beacon, Probe, Authentication, Association, EAPOL, Deauthentication.
+* Comparer une connexion Wi-Fi classique, une connexion WPA3 et un mode transition WPA2/WPA3.
+
+## 3. Environnement utilisé
+
+L’environnement de travail utilisé pour ce projet est le suivant :
+
+```text
+Serveur Proxmox
+└── VM Kali Linux
+    ├── Wireshark
+    ├── tshark
+    ├── aircrack-ng
+    └── fichiers de capture .pcap / .pcapng
+```
+
+La VM Kali Linux a été utilisée principalement pour l’analyse des fichiers fournis.
+Pour la capture Wi-Fi réelle, une carte Wi-Fi compatible avec le mode monitor est nécessaire.
+
+## 4. Outils utilisés
+
+### Wireshark
+
+Wireshark a été utilisé pour ouvrir les fichiers de capture et analyser les trames Wi-Fi de manière graphique.
+
+Exemple :
+
+```bash
+wireshark dot11-sample.pcap
+```
+
+### tshark
+
+`tshark` a été utilisé pour extraire des informations en ligne de commande.
+
+Exemple :
+
+```bash
+tshark -r dot11-sample.pcap -Y "eapol"
+```
+
+### aircrack-ng
+
+La suite `aircrack-ng` a été étudiée pour comprendre les outils liés à la capture Wi-Fi, au mode monitor et à l’analyse de sécurité Wi-Fi.
+
+Installation :
+
+```bash
+sudo apt update
+sudo apt install wireshark tshark aircrack-ng -y
+```
+
+## 5. Fichiers analysés
+
+Trois fichiers principaux ont été étudiés.
+
+### 5.1 `dot11-sample.pcap`
+
+Ce fichier permet d’observer une connexion Wi-Fi classique.
+Il contient les principales phases d’une connexion entre un client et un point d’accès.
+
+Trames analysées :
+
+* Beacon
+* Probe Request
+* Probe Response
+* Authentication
+* Association
+* EAPOL
+* Deauthentication
+
+Objectif de l’analyse :
+
+Comprendre la chronologie complète d’une connexion Wi-Fi :
+
+```text
+Beacon → Probe → Authentication → Association → EAPOL → Données chiffrées → Deauthentication
+```
+
+Ce fichier a permis d’identifier le rôle de chaque type de trame dans la connexion d’un client à un réseau Wi-Fi.
+
+### 5.2 `wpa3.pcapng`
+
+Ce fichier présente une connexion utilisant WPA3-Personal.
+
+L’objectif était d’identifier les éléments propres à WPA3 :
+
+* SAE, pour Simultaneous Authentication of Equals ;
+* RSN Information ;
+* Protected Management Frames ;
+* échange EAPOL après l’authentification SAE.
+
+Différence importante observée :
+
+Dans WPA2-Personal, l’authentification repose sur PSK.
+Dans WPA3-Personal, l’authentification repose sur SAE, ce qui améliore la résistance aux attaques par dictionnaire hors ligne.
+
+### 5.3 `wpa3_transition_wpa3client_24ghz.pcapng`
+
+Ce fichier permet d’étudier un mode transition WPA2/WPA3 sur la bande 2,4 GHz.
+
+L’objectif était de comprendre comment un réseau peut accepter à la fois :
+
+* des clients compatibles WPA2 ;
+* des clients compatibles WPA3.
+
+Ce mode est utile lors d’une migration vers WPA3, mais il représente aussi un compromis de sécurité, car WPA2 reste disponible.
+
+## 6. Filtres Wireshark utilisés
+
+### Trames Beacon
+
+```text
+wlan.fc.type_subtype == 0x08
+```
+
+### Probe Request
+
+```text
+wlan.fc.type_subtype == 0x04
+```
+
+### Probe Response
+
+```text
+wlan.fc.type_subtype == 0x05
+```
+
+### Authentication
+
+```text
+wlan.fc.type_subtype == 0x0b
+```
+
+### Association Request / Response
+
+```text
+wlan.fc.type_subtype == 0x00 || wlan.fc.type_subtype == 0x01
+```
+
+### EAPOL
+
+```text
+eapol
+```
+
+### Deauthentication
+
+```text
+wlan.fc.type_subtype == 0x0c
+```
+
+### Trames protégées / chiffrées
+
+```text
+wlan.fc.protected == 1
+```
+
+## 7. Analyse technique synthétique
+
+L’analyse des captures a permis de comprendre qu’une connexion Wi-Fi ne se limite pas à l’entrée d’un mot de passe.
+Elle suit une chronologie précise composée de plusieurs étapes.
+
+### 7.1 Découverte du réseau
+
+Le point d’accès diffuse régulièrement des trames Beacon pour annoncer le réseau.
+Le client peut également envoyer des Probe Request pour rechercher activement les réseaux disponibles.
+
+### 7.2 Authentification
+
+Dans une connexion Wi-Fi classique, l’authentification 802.11 peut être de type Open System.
+Dans une connexion WPA3, cette étape est remplacée par une authentification SAE.
+
+### 7.3 Association
+
+Après l’authentification, le client envoie une Association Request afin de rejoindre officiellement le point d’accès.
+Le point d’accès répond avec une Association Response.
+
+### 7.4 Négociation des clés
+
+Les trames EAPOL permettent d’observer le 4-Way Handshake.
+Cet échange sert à installer les clés de session utilisées pour chiffrer les communications.
+
+### 7.5 Désauthentification
+
+Les trames Deauthentication indiquent la fin ou l’interruption d’une connexion.
+Elles peuvent être légitimes, mais peuvent aussi être utilisées dans certaines attaques de déconnexion si elles sont envoyées massivement ou de manière anormale.
+
+## 8. Difficultés rencontrées
+
+### 8.1 Compréhension des trames 802.11
+
+La première difficulté a été de comprendre la différence entre les types de trames Wi-Fi.
+
+Au début, les trames Beacon, Probe, Authentication, Association et EAPOL semblaient proches, car elles apparaissent toutes dans la phase de connexion.
+Il a donc fallu les distinguer selon leur rôle exact :
+
+* Beacon : annonce du réseau par le point d’accès ;
+* Probe : recherche active d’un réseau par le client ;
+* Authentication : première étape d’authentification 802.11 ;
+* Association : rattachement du client au point d’accès ;
+* EAPOL : négociation des clés de chiffrement ;
+* Deauthentication : fin ou rupture de la connexion.
+
+Cette difficulté a été résolue en appliquant des filtres Wireshark spécifiques et en reconstituant la chronologie complète de la connexion.
+
+### 8.2 Différence entre authentification 802.11 et authentification WPA/WPA3
+
+Une autre difficulté importante a été de ne pas confondre l’authentification 802.11 avec l’authentification de sécurité WPA/WPA2/WPA3.
+
+Dans une capture classique, une trame Authentication peut indiquer Open System Authentication.
+Cela ne signifie pas que le réseau est ouvert ou non sécurisé.
+Cela signifie seulement que l’authentification de niveau 802.11 est ouverte, tandis que la vraie négociation de sécurité intervient ensuite avec EAPOL.
+
+Dans le cas de WPA3, l’authentification SAE apparaît directement dans les trames Authentication.
+C’est une différence importante entre WPA2 et WPA3.
+
+### 8.3 Lecture des champs RSN
+
+Les champs RSN Information sont essentiels pour identifier la sécurité du réseau, mais leur lecture n’est pas immédiate.
+
+Il a fallu comprendre les éléments suivants :
+
+* Group Cipher Suite ;
+* Pairwise Cipher Suite ;
+* AKM Suite ;
+* RSN Capabilities ;
+* PMF capable ;
+* PMF required.
+
+Ces champs permettent d’identifier si le réseau utilise WPA2, WPA3, PSK, SAE, CCMP/AES ou les Protected Management Frames.
+
+La difficulté vient du fait que Wireshark affiche parfois des valeurs techniques comme `00:0f:ac:04` ou `00:0f:ac:08`.
+Il faut ensuite les interpréter :
+
+```text
+00:0f:ac:04 = CCMP/AES
+00:0f:ac:02 = PSK
+00:0f:ac:08 = SAE
+```
+
+### 8.4 Analyse de WPA3
+
+L’analyse de WPA3 a demandé plus d’attention qu’une connexion WPA2 classique.
+
+Dans WPA3, l’élément principal à identifier est SAE.
+Il faut repérer les trames Authentication avec l’algorithme SAE, puis comprendre que l’échange EAPOL reste présent après SAE.
+
+La difficulté était donc de comprendre que WPA3 ne supprime pas EAPOL.
+SAE intervient d’abord pour établir une authentification plus robuste, puis EAPOL sert ensuite à installer les clés de session.
+
+### 8.5 Compréhension du mode transition WPA2/WPA3
+
+Le mode transition WPA2/WPA3 a été difficile à interpréter, car il mélange deux logiques de sécurité.
+
+Un même réseau peut annoncer à la fois :
+
+* WPA2-PSK pour les anciens clients ;
+* WPA3-SAE pour les clients récents.
+
+Ce mode est pratique pour la compatibilité, mais il peut réduire le niveau de sécurité global, car WPA2 reste disponible.
+
+La difficulté principale a été de comprendre que le mode transition est un compromis temporaire, utile pendant une migration, mais moins sécurisé qu’un réseau WPA3 strict.
+
+### 8.6 Utilisation de Kali dans une VM Proxmox
+
+Le projet a été réalisé avec une VM Kali Linux hébergée sur Proxmox.
+Cette configuration fonctionne très bien pour analyser des fichiers `.pcap` et `.pcapng`.
+
+Cependant, pour capturer du trafic Wi-Fi réel, une difficulté apparaît : une interface réseau virtuelle Proxmox ne permet pas de capturer directement les trames Wi-Fi 802.11.
+
+Pour faire une vraie capture Wi-Fi en mode monitor, il faut :
+
+* une carte Wi-Fi USB compatible Linux ;
+* le support du mode monitor ;
+* un passthrough USB entre Proxmox et la VM Kali ;
+* les pilotes adaptés dans Kali.
+
+Sans cette carte Wi-Fi compatible, il est possible d’analyser les fichiers fournis, mais pas de capturer correctement les trames Beacon, Probe, Authentication ou Deauthentication en temps réel.
+
+### 8.7 Interprétation des trames Deauthentication
+
+Les trames Deauthentication peuvent être normales ou suspectes.
+La difficulté a été de ne pas conclure trop vite à une attaque.
+
+Une seule trame Deauthentication peut simplement indiquer qu’un client quitte le réseau.
+En revanche, un grand nombre de trames Deauthentication envoyées rapidement vers plusieurs clients pourrait indiquer une attaque de désauthentification.
+
+Il a donc fallu analyser :
+
+* la source de la trame ;
+* la destination ;
+* le reason code ;
+* le nombre de trames ;
+* le contexte dans la chronologie.
+
+## 9. Ce que j’ai appris
+
+Ce projet m’a permis de mieux comprendre le fonctionnement réel d’une connexion Wi-Fi.
+
+J’ai appris à :
+
+* lire une capture Wi-Fi dans Wireshark ;
+* identifier les différentes phases d’une connexion ;
+* reconnaître les trames de management ;
+* repérer un échange EAPOL ;
+* différencier WPA2 et WPA3 ;
+* identifier SAE dans une capture ;
+* comprendre le rôle des Protected Management Frames ;
+* analyser les risques liés au mode transition WPA2/WPA3 ;
+* documenter une analyse réseau de manière structurée.
+
+## 10. Intérêt cybersécurité
+
+L’analyse de trames Wi-Fi est utile en cybersécurité, car elle permet de vérifier concrètement le niveau de sécurité d’un réseau.
+
+Elle permet notamment de répondre aux questions suivantes :
+
+* Le réseau utilise-t-il WPA2 ou WPA3 ?
+* Le chiffrement est-il basé sur AES/CCMP ?
+* L’authentification repose-t-elle sur PSK ou SAE ?
+* Les Protected Management Frames sont-elles activées ?
+* Le client s’associe-t-il correctement au point d’accès ?
+* Y a-t-il des désauthentifications suspectes ?
+* Le réseau est-il en mode transition WPA2/WPA3 ?
+
+Ce type d’analyse est utile pour l’administration réseau, l’audit de sécurité, la supervision et la détection d’incidents.
+
+## 11. Structure du dépôt
+
+```text
+wifi/
+├── README.md
+├── captures/
+│   ├── dot11-sample.pcap
+│   ├── wpa3.pcapng
+│   └── wpa3_transition_wpa3client_24ghz.pcapng
+├── screenshots/
+│   ├── 01_beacon.png
+│   ├── 02_probe.png
+│   ├── 03_authentication.png
+│   ├── 04_association.png
+│   ├── 05_eapol.png
+│   └── 06_deauthentication.png
+└── analyses/
+    ├── dot11-sample-analysis.md
+    ├── wpa3-analysis.md
+    └── wpa3-transition-analysis.md
+```
+
+## 12. Conclusion
+
+Ce projet m’a permis de passer d’une compréhension théorique du Wi-Fi à une analyse concrète de trames réseau.
+
+Les trois captures étudiées montrent une progression logique :
+
+```text
+Connexion Wi-Fi classique
+        ↓
+Connexion WPA3 avec SAE
+        ↓
+Mode transition WPA2/WPA3
+```
+
+L’analyse de ces fichiers m’a permis de comprendre les étapes techniques d’une connexion Wi-Fi, d’identifier les mécanismes de sécurité utilisés et de mieux interpréter les risques associés à certaines configurations.
+
+Ce travail constitue une base solide pour des activités d’administration réseau, d’audit Wi-Fi et de détection d’incidents de sécurité.
